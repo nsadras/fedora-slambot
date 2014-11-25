@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
 import sys
@@ -7,7 +8,7 @@ MOTOR_L = 0x0a
 MOTOR_R = 0x0b
 
 def i2cread(address, register):
-    result = check_output(["i2cget", "-y", "1", str(address), str(register)])
+    result = check_output(["sudo", "i2cget", "-y", "1", str(address), str(register)])
     result.strip("\n")
     return result
 
