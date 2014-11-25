@@ -1,0 +1,6 @@
+Name: slam_sensors
+Description: Description of slam_sensors
+Version: 0.0.0
+Cflags: -I
+Libs: -L/home/pi/fedora-slambot/install/lib 
+Requires: 
