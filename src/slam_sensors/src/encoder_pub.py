@@ -1,25 +1,20 @@
 #!/usr/bin/env python
-import rospy
+import rospy, sys, i2c
 from std_msgs.msg import String
-import sys
 from subprocess import check_output
 
 MOTOR_L = 0x0a
 MOTOR_R = 0x0b
-
-def i2cread(address, register):
-    result = check_output(["sudo", "i2cget", "-y", "1", str(address), str(register)])
-    result.strip("\n")
-    return result
+GYRO = 0x69
 
 def stream_encoder():
     rospy.init_node('encoder')
-    pub = rospy.Publisher('encoder_streamer', String)
+    pub = rospy.Publisher('encoder_data', String)
 
     r = rospy.Rate(10)
 
     while not rospy.is_shutdown():
-        pub_string = i2cread(MOTOR_L, 0x20)
+        pub_string = i2c.read(GYRO, 0x28)
         pub.publish(pub_string)
         r.sleep()
 
