@@ -34,12 +34,14 @@ def callback(message):
     if message.data == 'up':
         chassis.move(100,100)
     elif message.data == 'down':
-        #chassis.move(-100,-100)
-        chassis.stop()
+        chassis.move(-100,-100)
+        #chassis.stop()
     elif message.data == 'left':
         chassis.move(-100,100)
     elif message.data == 'right':
         chassis.move(100,-100)
+    elif message.data == 'stop':
+        chassis.stop()
 
 def listener():
     rospy.init_node('control_listener')
