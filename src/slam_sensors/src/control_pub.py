@@ -2,19 +2,29 @@
 import rospy,sys,tty,termios
 from std_msgs.msg import String
 
-import pyglet
- 
-interface = pyglet.window.Window(800, 600)
-keys = {}
- 
-@interface.event
-def on_key_press(symbol, modifiers):
-    keys[chr(symbol % 256)] = True
- 
-@interface.event
-def on_key_release(symbol, modifiers):
-    keys[chr(symbol % 256)] = False
- 
+def getch():
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+def get():
+        k = getch()
+        if k=='w':
+                return "up"
+        elif k=='s':
+                return "down"
+        elif k=='d':
+                return "right"
+        elif k=='a':
+                return "left"
+        else:
+                return "stop"
+
 def stream_controls():
     rospy.init_node('control')
     pub = rospy.Publisher('control_data', String)
@@ -22,22 +32,12 @@ def stream_controls():
     r = rospy.Rate(10)
 
     while not rospy.is_shutdown():
-        if keys["w"]:
-            msg = "up"
-        elif keys["s"]:
-            msg = "down"
-        elif keys["a"]:
-            msg = "left"
-        elif keys["d"]:
-            msg = "right"
-        else:
-            msg = "stop"
+        msg = get()
         pub.publish(msg)
         r.sleep()
 
 
 if __name__ == '__main__':
-    pyglet.app.run()
     try:
         stream_controls()
     except rospy.ROSInterruptException:
