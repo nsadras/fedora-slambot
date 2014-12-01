@@ -1,44 +1,29 @@
 #!/usr/bin/env python
 import rospy,sys,tty,termios
 from std_msgs.msg import String
+import pyglet
+ 
+interface = pyglet.window.Window(200, 200)
 
-def getch():
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return ch
+@interface.event
+def on_key_press(symbol, modifiers):
+    k = chr(symbol % 256)
+    if k=='w':
+            pub.publish("up")
+    elif k=='s':
+            pub.publish("down")
+    elif k=='d':
+            pub.publish("right")
+    elif k=='a':
+            pub.publish("left")
+    r.sleep()
 
-def get():
-        k = getch()
-        if k=='w':
-                return "up"
-        elif k=='s':
-                return "down"
-        elif k=='d':
-                return "right"
-        elif k=='a':
-                return "left"
-        else:
-                return "stop"
-
-def stream_controls():
-    rospy.init_node('control')
-    pub = rospy.Publisher('control_data', String)
-
-    r = rospy.Rate(10)
-
-    while not rospy.is_shutdown():
-        msg = get()
-        pub.publish(msg)
-        r.sleep()
-
+@interface.event
+def on_key_release(symbol, modifiers):
+    pub.publish('stop')
 
 if __name__ == '__main__':
-    try:
-        stream_controls()
-    except rospy.ROSInterruptException:
-        pass
+    rospy.init_node('control')
+    pub = rospy.Publisher('control_data', String, queue_size=1)
+    r = rospy.Rate(10)
+    pyglet.app.run()
