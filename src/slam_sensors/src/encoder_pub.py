@@ -23,7 +23,7 @@ def stream_encoder():
         high = i2c.read(GYRO, 0x2d).strip("\n")
 	low = i2c.read(GYRO, 0x2c)[2:]
 	raw = int(high + low, 16)
-	msg = to_signed_int(raw)	
+	msg = (to_signed_int(raw) / 114)*.0174 # convert from raw data to radians per second	
         pub.publish(str(msg))
         r.sleep()
 
