@@ -1,0 +1,5 @@
+<launch>
+    <node name="camera_streamer" pkg="slam_sensors" type="camera_streamer.py"/> 
+    <node name="encoder" pkg="slam_sensors" type="encoder_pub.py"/> 
+    <node name="control_listener" pkg="slam_sensors" type="control_sub.py"/>
+</launch>
