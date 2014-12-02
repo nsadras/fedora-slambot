@@ -1,6 +1,8 @@
 import pyglet
 import numpy as np
 
+from slam import *
+
 game_window = pyglet.window.Window(800, 600)
 
 def Rotate(x,y,theta):
@@ -71,17 +73,31 @@ class Robot:
             label.y = self.y + y
             label.draw()
 
-    def sensors(self, pos_variance = 10.0, landmark_variance = 10.0):
-        sensed_landmarks = {}
+    def sensors(self, pos_variance = 10.0, landmark_variance = 10.0, vel_variance = 10.0):
+        sensed_landmarks = []
         sensed_position = {'x':self.x + np.random.normal(scale=pos_variance), 'y':self.y + np.random.normal(scale=pos_variance)}
         for landmark in Landmark.landmarks:
             dx = landmark.x - self.x
             dy = landmark.y - self.y
+            r = np.sqrt(dx ** 2 + dy ** 2)
             if dx*dx + dy*dy < Robot.SENSOR_RADIUS*Robot.SENSOR_RADIUS:
-                sensed_landmarks[landmark.index] = (dx + np.random.normal(scale=landmark_variance), dy + np.random.normal(scale=landmark_variance))
-            else:
-                sensed_landmarks[landmark.index] = None
-        return {'robot':sensed_position,'landmarks':sensed_landmarks}
+                sensed_landmarks.append([landmark.index,r])
+        if 'w' in keys and keys['w']:
+            r_mul = 1.0
+        elif 's' in keys and keys['s']:
+            r_mul = -1.0
+        else:
+            r_mul = 0.0
+
+        if 'a' in keys and keys['a']:
+            theta_mul = 1.0
+        elif 'd' in keys and keys['d']:
+            theta_mul = -1.0
+        else:
+            theta_mul = 0.0
+
+        sensed_velocity = [Robot.VELOCITY*r_mul + np.random.normal(scale=vel_variance), Robot.ROTATION_VELOCITY*theta_mul + np.random.normal(scale=vel_variance), 0.03]
+        return {'robot':sensed_velocity,'landmarks':sensed_landmarks}
     def up(self):
         dx,dy = Rotate(Robot.VELOCITY,0,self.theta)
         self.x += dx
@@ -120,14 +136,16 @@ class Landmark:
         self.label.draw()
 
 robot = Robot()
-robot.markers.append((50,50,pyglet.text.Label('potato',
-                                              font_name='Times New Roman',
-                                              font_size=12,
-                                              anchor_x='center', anchor_y='center')))
+NUMLANDMARKS = 2
+slamRobot = Slam(NUMLANDMARKS)
+slamRobot.position[0,0],slamRobot.position[1,0] = robot.x, robot.y
 
 def update(dt):
     game_window.clear()
     robot.draw()
+    data = robot.sensors()
+    sensors,landmarks = data['robot'],data['landmarks']
+    slamRobot.update(sensors,observations = landmarks)
     for landmark in Landmark.landmarks:
         landmark.draw()
     if 'w' in keys and keys['w']:
@@ -148,29 +166,8 @@ def on_key_release(symbol, modifiers):
     keys[chr(symbol % 256)] = False
 
 if __name__ == '__main__':
-    Landmark(400,325)
-    Landmark(400,275)
-    Landmark(450,325)
-    Landmark(450,275)
-    Landmark(500,325)
-    Landmark(500,275)
-    Landmark(550,325)
-    Landmark(550,275)
-    Landmark(600,325)
-    Landmark(600,275)
-    Landmark(650,300)
-    Landmark(650,250)
-    Landmark(650,200)
-    Landmark(600,225)
-    Landmark(600,175)
-    Landmark(550,225)
-    Landmark(550,175)
-    Landmark(500,225)
-    Landmark(500,175)
-    Landmark(450,225)
-    Landmark(450,175)
-    Landmark(400,225)
     Landmark(400,175)
+    Landmark(450,175)
 
     pyglet.clock.schedule_interval(update, 0.01)
     pyglet.app.run()

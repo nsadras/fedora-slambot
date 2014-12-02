@@ -1,6 +1,6 @@
 import numpy as np 
 
-class slam:
+class Slam:
     def __init__(self, numLandmarks):
         self.landmarks = [] 
         self.numLandmarks = numLandmarks
@@ -71,10 +71,11 @@ class slam:
 
                     #Kalman Gain Update
                     #TODO: ADD SENSOR NOISE
-                    kalman_gain = cov_bar * J_gain.T * np.linalg.inv(J_gain * cov_bar * J_gain.T)
+                    kalman_gain = cov_bar * J_gain.T * np.linalg.inv(J_gain * cov_bar * J_gain.T + np.eye(2)*1.0e2)
                     position_bar = position_bar + kalman_gain * difference 
                     cov_bar = (np.eye(self.numLandmarks * 2 + 3) - kalman_gain * J_gain) * cov_bar
 
         #Update
         self.position = position_bar
         self.cov = cov_bar
+        print self.cov
