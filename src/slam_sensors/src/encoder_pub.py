@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy, sys, i2c
 from std_msgs.msg import String
+from slam_sensors.msg import RobotVelocity
 from subprocess import check_output
 
 MOTOR_L = 0x0a
@@ -23,7 +24,16 @@ def stream_encoder():
         high = i2c.read(GYRO, 0x2d).strip("\n")
 	low = i2c.read(GYRO, 0x2c)[2:]
 	raw = int(high + low, 16)
-	msg = (to_signed_int(raw) / 114)*.0174 # convert from raw data to radians per second	
+        msg = RobotVelocity()
+	angular = (to_signed_int(raw) / 114)*.0174 # convert from raw data to radians per second	
+
+        left_velocity = i2c.readl(MOTOR_L, 0x04)
+        right_velocity = i2c.readl(MOTOR_R, 0x04)
+
+        print "left: %s right: %s" % (left_velocity, right_velocity)
+
+        msg.angular_velocity = angular
+        msg.linear_velocity = right_velocity
         pub.publish(str(msg))
         r.sleep()
 
