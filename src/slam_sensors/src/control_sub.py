@@ -8,7 +8,7 @@ def init_motor(bus, motor):
 
 def set_speed(bus, motor, speed):
     if (speed < 0):
-        speed = hex(((abs(speed) ^ 0xffff) + 1) & 0xffff)
+        speed = ((abs(speed) ^ 0xffff) + 1) & 0xffff
     i2c.writel(bus, motor, 0x04, 0x0000)
     i2c.writel(bus, motor, 0x06, speed)
     i2c.writel(bus, motor, 0x90, 0x0004)
