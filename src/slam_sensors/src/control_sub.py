@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import rospy, i2c
+import rospy, i2c, smbus
 from std_msgs.msg import String
 
-def init_motor(motor):
-    i2c.write(motor, 0x01, 0x13)
+def init_motor(bus, motor):
+    i2c.write(bus, motor, 0x01, 0x13)
 
 def set_speed(bus, motor, speed):
     if (speed < 0):
@@ -20,8 +20,8 @@ class Chassis:
         self.motor_left = motor_left
         self.motor_right = motor_right
         self.bus = smbus.SMBus(1)
-        init_motor(motor_left)
-        init_motor(motor_right)
+        init_motor(self.bus, motor_left)
+        init_motor(self.bus, motor_right)
 
     def move(self, speed_left, speed_right):
         set_speed(self.bus, self.motor_left, speed_left)
