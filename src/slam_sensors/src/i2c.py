@@ -26,10 +26,9 @@ def writel(address, register, value):
     call(["i2cset", "-y", "1",  str(address), str(register), str(value), "w"])
 """
 
-def write(address, register, value):
-    bus = smbus.SMBus(1)
+def write(bus, address, register, value):
     bus.write_byte_data(address, register, value)
 
-def writel(address, register, value):
-    bus = smbus.SMBus(1)
+def writel(bus, address, register, value):
     bus.write_word_data(address, register, value)
+

@@ -6,25 +6,26 @@ from std_msgs.msg import String
 def init_motor(motor):
     i2c.write(motor, 0x01, 0x13)
 
-def set_speed(motor, speed):
+def set_speed(bus, motor, speed):
     if (speed < 0):
         speed = hex(((abs(speed) ^ 0xffff) + 1) & 0xffff)
-    i2c.writel(motor, 0x04, 0x0000)
-    i2c.writel(motor, 0x06, speed)
-    i2c.writel(motor, 0x90, 0x0004)
-    i2c.writel(motor, 0x80, 0xffff)
-    i2c.write(motor, 0x08, 0x00)
+    i2c.writel(bus, motor, 0x04, 0x0000)
+    i2c.writel(bus, motor, 0x06, speed)
+    i2c.writel(bus, motor, 0x90, 0x0004)
+    i2c.writel(bus, motor, 0x80, 0xffff)
+    i2c.write(bus, motor, 0x08, 0x00)
 
 class Chassis:
     def __init__(self, motor_left, motor_right):
         self.motor_left = motor_left
         self.motor_right = motor_right
+        self.bus = smbus.SMBus(1)
         init_motor(motor_left)
         init_motor(motor_right)
 
     def move(self, speed_left, speed_right):
-        set_speed(self.motor_left, speed_left)
-        set_speed(self.motor_right, speed_right)
+        set_speed(self.bus, self.motor_left, speed_left)
+        set_speed(self.bus, self.motor_right, speed_right)
 
     def stop(self):
         self.move(0,0)
