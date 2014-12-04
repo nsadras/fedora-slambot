@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import rospy, sys, i2c
+import rospy, sys, i2c, smbus
 from std_msgs.msg import String
 from slam_sensors.msg import RobotVelocity
 from subprocess import check_output
