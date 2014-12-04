@@ -6,7 +6,8 @@ from subprocess import check_output
 
 MOTOR_L = 0x0a
 MOTOR_R = 0x0b
-GYRO = 0x69
+GYRO = 0x68
+bus = smbus.SMBus(1)
 
 def to_signed_int(bits):
     if not (bits >> 15) & 1:
@@ -21,8 +22,8 @@ def stream_encoder():
     r = rospy.Rate(10)
 
     while not rospy.is_shutdown():
-        high = i2c.read(GYRO, 0x2d).strip("\n")
-	low = i2c.read(GYRO, 0x2c)[2:]
+        high = i2c.read(GYRO, 0x47).strip("\n")
+	low = i2c.read(GYRO, 0x48)[2:]
 	raw = int(high + low, 16)
         msg = RobotVelocity()
 	angular = (to_signed_int(raw) / 114)*.0174 # convert from raw data to radians per second	
@@ -38,9 +39,10 @@ def stream_encoder():
         r.sleep()
 
 if __name__ == '__main__':
-    i2c.write(GYRO, 0x20, 0x1f)
-    i2c.write(GYRO, 0x22, 0x08)
-    i2c.write(GYRO, 0x24, 0x80)
+    #i2c.write(GYRO, 0x20, 0x1f)
+    #i2c.write(GYRO, 0x22, 0x08)
+    #i2c.write(GYRO, 0x24, 0x80)
+    i2c.write(bus, GYRO, 0x6b, 0x00)
     try:
         stream_encoder()
     except rospy.ROSInterruptException:
