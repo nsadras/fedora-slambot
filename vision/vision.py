@@ -1,10 +1,10 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import cv2
 import IPython
-from constants import constants
 from scipy.interpolate import RectBivariateSpline, interp2d
 from scipy.signal import convolve2d
+
+CALLIBRATION_AID = False
 
 def Homography(im1_pts, im2_pts):
     x1,y1 = im1_pts[0]
@@ -92,7 +92,9 @@ def WarpImage(img, H, H_inv):
     y_min = int(min(ul_y, ur_y, ll_y, lr_y))
     y_max = int(max(ul_y, ur_y, ll_y, lr_y))
     interp = MakeInterp(img)
-
+    if (x_max - x_min)*(y_max - y_min) > 100000:
+        print (x_max - x_min)*(y_max - y_min)
+        return None, (None,None,None,None)
     coords = ToCoordMatrix(np.r_[x_min:x_max],np.r_[y_min:y_max])
     x,y = ToXYList(coords)
     u,v = ToXYList(HomogenizeCoordMatrix(H*coords))
@@ -120,12 +122,13 @@ def HSVRange(img, hsvs, tolerances, blur_radius = 1):
             out = cv2.bitwise_or(out, HSVFilter(img, h - h_tolerance, s - s_tolerance, v - v_tolerance, h + h_tolerance, s + s_tolerance, v + v_tolerance, blur_radius))
     return out
 
-def GetBlobs(mask):
+def GetBlobs(mask, min_area = 50.0):
     contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
     out = []
     for cnt in contours:
+        area = cv2.contourArea(cnt)
         M = cv2.moments(cnt)
-        if M['m00'] == 0:
+        if M['m00'] == 0 or area < min_area:
             continue
         cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
         out.append((cx,cy))
@@ -142,25 +145,7 @@ def TransformBlobs(blobs, H):
         return None
     return BlobsFromMatrix(H*BlobsToMatrix(blobs))
 
-calibration_points = []
-calibration_images = []
-def OnClick(event,x,y,flags,param):
-    if event == cv2.EVENT_LBUTTONUP and len(calibration_points) < 5:
-        calibration_points.append((x,y))
-cv2.namedWindow('calibration')
-cv2.setMouseCallback('calibration',OnClick)
-
-#last_point = None
-#def OnClick2(event,x,y,flags,param):
-    #global last_point
-    #if event == cv2.EVENT_LBUTTONUP:
-        #if last_point:
-            #print GetDistance(last_point, (x,y), vision.H)
-        #last_point = (x,y)
-#cv2.namedWindow('frame')
-#cv2.setMouseCallback('frame',OnClick2)
-
-def RedFilter(frame, threshold = 10, red_value = 170):
+def RedFilter(frame, threshold = 20, red_value = 170):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     hsv[hsv[:,:,0] < threshold,0] = red_value
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
@@ -174,6 +159,13 @@ def GetDistance(p1, p2, H):
     p2_h = p2_h / p2_h[2,0]
     dist = p2_h - p1_h
     return np.linalg.norm(dist)
+
+def GetPointUnderH(p1, H):
+    x1,y1 = p1
+    p1_h = H*np.array([[x1,y1,1]]).T
+    p1_h = p1_h / p1_h[2,0]
+    return np.array([p1_h[0,0], p1_h[1,0]])
+
 
 def GetAverageClusters(blob, H, suppression_radius = 8):
     blob_h = TransformBlobs(blob, H)
@@ -202,7 +194,7 @@ def FindSquareCorrespondences(a, b, a_h, b_h, dist, tolerance):
             out[(x,y)] = tuple(b[indices[0][0]])
     return out
 
-def DetectMarkers(r,g,b,y,H, tolerance = 4):
+def DetectMarkers(r,g,b,y,H, tolerance = 6):
     if r is None or g is None or b is None or y is None:
         return []
     r_h = np.array(TransformBlobs(r,H))
@@ -230,11 +222,60 @@ def GetBounds(a,b,c,d):
     dx,dy = d
     return min(ax,bx,cx,dx),max(ax,bx,cx,dx),min(ay,by,cy,dy),max(ay,by,cy,dy)
 
+def GetRGBBounds(img, vision):
+    kernel = np.ones((5,5),np.uint8)
+    black_pix = HSVRange(img,
+            vision.params['BLACK']['hsvs'],
+            vision.params['BLACK']['thresh'],
+            blur_radius = 5)
+    red_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
+            vision.params['RED']['hsvs'],
+            vision.params['RED']['thresh'],
+            blur_radius = 1))
+    green_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
+            vision.params['GREEN']['hsvs'],
+            vision.params['GREEN']['thresh'],
+            blur_radius = 1))
+    blue_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
+            vision.params['BLUE']['hsvs'],
+            vision.params['BLUE']['thresh'],
+            blur_radius = 1))
+    yellow_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
+            vision.params['YELLOW']['hsvs'],
+            vision.params['YELLOW']['thresh'],
+            blur_radius = 1))
+    #red_pix = cv2.morphologyEx(red_pix, cv2.MORPH_OPEN, kernel)
+    green_pix = cv2.morphologyEx(green_pix, cv2.MORPH_OPEN, kernel)
+    #blue_pix = cv2.morphologyEx(blue_pix, cv2.MORPH_OPEN, kernel)
+    #yellow_pix = cv2.morphologyEx(yellow_pix, cv2.MORPH_OPEN, kernel)
+
+    r_y,r_x = np.nonzero(red_pix)
+    g_y,g_x = np.nonzero(green_pix)
+    b_y,b_x = np.nonzero(blue_pix)
+    y_y,y_x = np.nonzero(yellow_pix)
+
+    if len(r_x) == 0 or len(r_y) == 0 or len(g_x) == 0 or len(g_y) == 0 or len(b_x) == 0 or len(b_y) == 0  or len(y_x) == 0 or len(y_y) == 0:
+        return None
+
+    p1 = (np.max(r_x), np.max(r_y))
+    p2 = (np.min(g_x), np.max(g_y))
+    p3 = (np.min(b_x), np.min(b_y))
+    p4 = (np.max(y_x), np.min(y_y))
+    return p1,p2,p3,p4
+
+def PercentBlack(img, threshold):
+    h,w,_ = np.shape(img)
+    if h*w == 0:
+        return None
+    black_pix = np.average(img/255.0, axis=2) < threshold
+    height, width = np.shape(black_pix)
+    return np.count_nonzero(black_pix) / float(height*width)
 
 OFFSET=24/2
 MARKER_WIDTH_PX = 100
 MARKER_HEIGHT_PX = 129
-def IdentifyMarker(marker,img,marker_db, vision):
+RECTIFICATION_DIMENSION = 100
+def IdentifyMarker(marker,img, vision, black_threshold = 0.5, cell_threshold = 0.5):
     r, g, b, y = marker
     r_x, r_y = r
     g_x, g_y = g
@@ -249,84 +290,84 @@ def IdentifyMarker(marker,img,marker_db, vision):
     H_inv = np.linalg.inv(H)
     ul_x, ul_y, _ = HomogenizeCoords(H_inv*np.matrix([r_x-min_x,r_y-min_y,1]).T).flatten().tolist()[0]
     warp_float, _ = WarpImage(cropped/255.0,H,H_inv)
-    warped = (255*warp_float).astype(np.uint8)[ul_y:ul_y + MARKER_HEIGHT_PX, ul_x:ul_x + MARKER_WIDTH_PX]
-    height, width, _ = np.shape(warped)
-    if MARKER_HEIGHT_PX-height < 0 or MARKER_WIDTH_PX-width < 0:
+    if warp_float is None:
+        print "Failed first warp image."
         return None
-    warped = np.pad(warped,((np.floor((MARKER_HEIGHT_PX-height)/2.0).astype(int),np.ceil((MARKER_HEIGHT_PX-height)/2.0).astype(int)),
-                            (np.floor((MARKER_WIDTH_PX-width)/2.0).astype(int),np.ceil((MARKER_WIDTH_PX-width)/2.0).astype(int)),
-                            (0,0)),
-                    mode='constant')
-    """
-    best_key = None
-    best_ncc = -np.inf
-    nccs = {}
-    for key in marker_db:
-        cv2.imshow(key,0.5*marker_db[key] + 0.5*warped)
-        ncc = np.sum((marker_db[key] - np.mean(marker_db[key]))/np.std(marker_db[key]) * (warped - np.mean(warped))/np.std(warped)) / np.size(warped)
-        nccs[key] = ncc
-        if ncc > best_ncc:
-            best_ncc = ncc
-            best_key = key
-    return best_key
-    """
-    """
-    best_key = None
-    best_ncc = -np.inf
-    nccs = {}
-    for key in marker_db:
-        warped = (warped - np.mean(warped))/np.std(warped)
-        ncc = np.max(convolve2d(warped, marker_db[key],mode='valid'))
-        nccs[key] = ncc
-        if ncc > best_ncc:
-            best_ncc = ncc
-            best_key = key
-    return best_key
-    """
-    black_pix = HSVRange(warped,
-        vision.params['BLACK']['hsvs'],
-        vision.params['BLACK']['thresh'],
-        blur_radius = 1)
-    x_indices, y_indices = np.nonzero(black_pix)
-    warp_crop = warped[np.min(x_indices):np.max(x_indices), np.min(y_indices):np.max(y_indices)]
-    if np.size(warp_crop) == 0:
-        return None
-    grey_cropped = np.average(warp_crop,axis=2) / 255.0
-    grey_cropped = (grey_cropped - np.average(grey_cropped)) / np.std(grey_cropped)
-    height, width = np.shape(grey_cropped)
+    warped = (255*warp_float).astype(np.uint8)
 
-    best_key = None
-    best_ncc = -np.inf
-    nccs = {}
-    for key in marker_db:
-        chunk = marker_db[key][(MARKER_HEIGHT_PX - height)/2:-(MARKER_HEIGHT_PX - height)/2,(MARKER_WIDTH_PX - width)/2:-(MARKER_WIDTH_PX - width)/2]
-        normalized_chunk = (chunk - np.average(chunk))/np.std(chunk)
-        ncc = np.sum(normalized_chunk * grey_cropped)
-        cv2.imshow(key,0.5*normalized_chunk + 0.5*grey_cropped)
-        nccs[key] = ncc
-        if ncc > best_ncc:
-            best_ncc = ncc
-            best_key = key
-    return best_key
+    bounds = GetRGBBounds(warped, vision)
+    if not bounds:
+        print "Could not get RGB Bounds."
+        return None
+    p1,p2,p3,p4 = bounds
+
+    H = Homography(
+            [(0,0),(RECTIFICATION_DIMENSION,0),(RECTIFICATION_DIMENSION, RECTIFICATION_DIMENSION), (0, RECTIFICATION_DIMENSION)],
+            [p1,p2,p3,p4],
+            )
+    H_inv = np.linalg.inv(H)
+    rectified, (x_min,x_max,y_min,y_max) = WarpImage(warped/255.0,H,H_inv)
+    if rectified is None:
+        print "Could not rectify."
+        return None
+    rectified = (255*rectified).astype(np.uint8)
+
+    bounds = GetRGBBounds(rectified, vision)
+    if not bounds:
+        print "Could not get RGBBounds 2."
+        return None
+    p1,p2,p3,p4 = bounds
+
+    rectified = rectified[max(p1[1],p2[1]):min(p3[1],p4[1]),max(p1[0],p4[0]):min(p2[0],p3[0]),:]
+    cell1 = rectified[:RECTIFICATION_DIMENSION/2, :RECTIFICATION_DIMENSION/2]
+    cell2 = rectified[:RECTIFICATION_DIMENSION/2, RECTIFICATION_DIMENSION/2:]
+    cell3 = rectified[RECTIFICATION_DIMENSION/2:, RECTIFICATION_DIMENSION/2:]
+    cell4 = rectified[RECTIFICATION_DIMENSION/2:, :RECTIFICATION_DIMENSION/2]
+
+
+    v1 = PercentBlack(cell1, black_threshold)
+    v2 = PercentBlack(cell2, black_threshold)
+    v3 = PercentBlack(cell3, black_threshold)
+    v4 = PercentBlack(cell4, black_threshold)
+    if v1 is None or v2 is None or v3 is None or v4 is None:
+        print "Could not compute percent black for one or more cells."
+        return None
+    identity = ((v1 >  cell_threshold) << 0) + ((v2 > cell_threshold) << 1) + ((v3 > cell_threshold) << 2) + ((v4 > cell_threshold) << 3)
+    return identity
+
+def PositionMarker(marker, frame, vision):
+    p1,p2,p3,p4 = marker
+    marker_center = (GetPointUnderH(p1,vision.H) + GetPointUnderH(p2,vision.H) + GetPointUnderH(p3,vision.H) + GetPointUnderH(p4,vision.H))/4.0
+
+    o = np.linalg.inv(vision.H)*np.matrix([marker_center[0],marker_center[1],1]).T
+    o /= o[2,0]
+    xo=int(o[0,0])
+    yo=int(o[1,0])
+    cv2.circle(frame,(xo,yo),3,[255,255,255],-1)
+
+    origin = GetPointUnderH(vision.params['coord_sys']['origin'], vision.H)
+    x = GetPointUnderH(vision.params['coord_sys']['x'], vision.H)
+    y = GetPointUnderH(vision.params['coord_sys']['y'], vision.H)
+    T = np.linalg.inv(np.matrix([[x[0] - origin[0], y[0] - origin[0]], [x[1] - origin[1], y[1] - origin[1]]]))
+    v = np.matrix([[marker_center[0] - origin[0]],[marker_center[1] - origin[1]]])
+    out_x, out_y = (T*v).T.tolist()[0]
+    out_x = out_x * vision.params['coord_sys']['x_dist'] + vision.params['coord_sys']['origin_pos'][0]
+    out_y = out_y * vision.params['coord_sys']['y_dist'] + vision.params['coord_sys']['origin_pos'][1]
+    return out_x, out_y
 
 class Vision:
     NUM_CALIBRATION_IMAGES = 100
-    CM_HEIGHT = 24
-    CM_WIDTH = 18
+    CM_HEIGHT = 22
+    CM_WIDTH = 16
     SQUARE_DIAG = 8
-    def __init__(self, marker_files, buf_length = 5):
-        self.buf_length = buf_length
+    def __init__(self):
         self.isCalibrated = False
-        self.marker_db = {}
-        for marker_file in marker_files:
-            self.marker_db[marker_file] = np.average(cv2.imread(marker_file) / 255.0,axis=2)
-            """
-            self.marker_db[marker_file] = np.average(cv2.imread(marker_file) / 255.0,axis=2)[OFFSET:-OFFSET, OFFSET:-OFFSET]
-            self.marker_db[marker_file] = (self.marker_db[marker_file] - np.mean(self.marker_db[marker_file])) / np.std(self.marker_db[marker_file])
-            self.marker_db[marker_file] = self.marker_db[marker_file][::-1,::-1]
-            """
+    def PreCalibrate(self, params, H):
+        self.params = params
+        self.H = H
+        self.isCalibrated = True
 
-    def Calibrate(self, images, r_point, g_point, b_point, y_point, black_point, n_std_r=5.0, n_std_g=3.5, n_std_b=5.0, n_std_y=5.0, n_std_black=1.0):
+    def Calibrate(self, images, r_point, g_point, b_point, y_point, black_point, n_std_r=6.0, n_std_g=6.0, n_std_b=6.0, n_std_y=6.0, n_std_black=1.0, std_offset = 2.0):
         r_hsv = []
         g_hsv = []
         b_hsv = []
@@ -344,13 +385,13 @@ class Vision:
             y_hsv.append(cv2.cvtColor(np.array([[img[y_y,y_x]]]), cv2.COLOR_BGR2HSV))
             black_hsv.append(cv2.cvtColor(np.array([[img[black_y,black_x]]]), cv2.COLOR_BGR2HSV))
         r_h, r_s, r_v = np.average(r_hsv, axis=0).flatten().astype(int)
-        r_h_t, r_s_t, r_v_t = np.std(r_hsv, axis=0).flatten().astype(int)
+        r_h_t, r_s_t, r_v_t = np.std(r_hsv, axis=0).flatten().astype(int) + std_offset
         g_h, g_s, g_v = np.average(g_hsv, axis=0).flatten().astype(int)
-        g_h_t, g_s_t, g_v_t = np.std(g_hsv, axis=0).flatten().astype(int)
+        g_h_t, g_s_t, g_v_t = np.std(g_hsv, axis=0).flatten().astype(int) + std_offset
         b_h, b_s, b_v = np.average(b_hsv, axis=0).flatten().astype(int)
-        b_h_t, b_s_t, b_v_t = np.std(b_hsv, axis=0).flatten().astype(int)
+        b_h_t, b_s_t, b_v_t = np.std(b_hsv, axis=0).flatten().astype(int) + std_offset
         y_h, y_s, y_v = np.average(y_hsv, axis=0).flatten().astype(int)
-        y_h_t, y_s_t, y_v_t = np.std(y_hsv, axis=0).flatten().astype(int)
+        y_h_t, y_s_t, y_v_t = np.std(y_hsv, axis=0).flatten().astype(int) + std_offset
         black_h, black_s, black_v = np.average(black_hsv, axis=0).flatten().astype(int)
         black_h_t, black_s_t, black_v_t = np.std(black_hsv, axis=0).flatten().astype(int)
 
@@ -366,9 +407,11 @@ class Vision:
                 'BLACK': {'hsvs':[[black_h,black_s,black_v]], 'thresh':[black_h_t*n_std_black,black_s_t*n_std_black,black_v_t*n_std_black]},
                 }
         print self.params
+        print self.H
         self.isCalibrated = True
 
     def ProcessFrame(self, frame):
+        frame = RedFilter(frame)
         black_pix = HSVRange(frame,
                 self.params['BLACK']['hsvs'],
                 self.params['BLACK']['thresh'],
@@ -394,16 +437,21 @@ class Vision:
                 blur_radius = 5)
         yellow_blobs = GetBlobs(cv2.bitwise_and(cv2.bitwise_not(black_pix),yellow_pix))
 
-
         red_centers =  GetAverageClusters(red_blobs, self.H)
         green_centers =  GetAverageClusters(green_blobs, self.H)
         blue_centers =  GetAverageClusters(blue_blobs, self.H)
         yellow_centers =  GetAverageClusters(yellow_blobs, self.H)
         markers = DetectMarkers(red_centers,green_centers,blue_centers,yellow_centers,self.H)
+
+        output = []
         for marker in markers:
-            m = IdentifyMarker(marker,frame,self.marker_db,self)
-            if m:
-                print m
+            identity = IdentifyMarker(marker,frame,self)
+            if not identity:
+                continue
+            position = PositionMarker(marker,frame,self)
+            if not position:
+                continue
+            output.append((identity, position))
 
         if red_centers:
             for center in red_centers:
@@ -425,7 +473,37 @@ class Vision:
             cv2.line(frame, p3, p4, [0,0,0])
             cv2.line(frame, p4, p1, [0,0,0])
 
+        if CALLIBRATION_AID:
+            asdf[0] = frame
         cv2.imshow('frame',frame)
+
+        return output
+
+if CALLIBRATION_AID:
+    asdf = [None]
+    def PrintColor(event,x,y,flags,param):
+        if event == cv2.EVENT_LBUTTONUP:
+            out = cv2.cvtColor(np.array([[asdf[0][y,x]]]), cv2.COLOR_BGR2HSV)
+            print "{0} {1} {2}".format(out[0,0,0],out[0,0,1],out[0,0,2])
+    cv2.namedWindow('frame')
+    cv2.setMouseCallback('frame',PrintColor)
+
+
+def CalibrationFrameIs(vision, frame):
+        frame = RedFilter(frame)
+        cv2.imshow('calibration',frame)
+        if len(calibration_points) == 5:
+            calibration_images.append(frame)
+        if len(calibration_images) == Vision.NUM_CALIBRATION_IMAGES:
+            print 'done waiting for points'
+            vision.Calibrate(calibration_images,
+                    calibration_points[0],
+                    calibration_points[1],
+                    calibration_points[2],
+                    calibration_points[3],
+                    calibration_points[4])
+            cv2.destroyWindow('calibration')
+
 
 if __name__ == '__main__':
     vision = Vision(['./markers/a.png','./markers/b.png','./markers/c.png','./markers/d.png','./markers/e.png'])
@@ -434,19 +512,8 @@ if __name__ == '__main__':
         ret, frame = cap.read()
         frame = RedFilter(frame)
         if not vision.isCalibrated:
-            cv2.imshow('calibration',frame)
-            if len(calibration_points) == 5:
-                calibration_images.append(frame)
-            if len(calibration_images) == Vision.NUM_CALIBRATION_IMAGES:
-                vision.Calibrate(calibration_images,
-                        calibration_points[0],
-                        calibration_points[1],
-                        calibration_points[2],
-                        calibration_points[3],
-                        calibration_points[4])
-                cv2.destroyWindow('calibration')
+            CalibrationFrameIs(vision,frame)
         else:
             vision.ProcessFrame(frame)
-            pass
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
