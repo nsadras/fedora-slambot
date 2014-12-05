@@ -71,8 +71,8 @@ class Robot:
     def get_angular_velocity(self):
         try:
             gyro_high = i2c.read(self.bus, self.gyro, 0x47)
-            gyro_low = i2c.read(self.bus, self.gyro, 0x48)[2:]
-            gyro_raw = int(gyro_high + gyro_low, 16)
+            gyro_low = i2c.read(self.bus, self.gyro, 0x48)
+            gyro_raw = (gyro_high << 8) | gyro_low
             angular = to_signed_int(gyro_raw) / 131.
             return angular
         except IOError as e:
@@ -81,9 +81,9 @@ class Robot:
     def get_linear_velocity(self):
         try:
             accel_high = i2c.read(self.bus, self.gyro, 0x3d)
-            accel_low = i2c.read(self.bus, self.gyro, 0x3e)[2:]
-            accel_raw = int(accel_high + accel_low, 16)
-            a = (to_signed_int(accel_raw) / 16384) * 9.81
+            accel_low = i2c.read(self.bus, self.gyro, 0x3e)
+            accel_raw = (accel_high << 8) | accel_low 
+            a = (to_signed_int(accel_raw) / 16384.) * 9.81
             dt = time.clock() - self.last_sample
             self.velocity = self.velocity + dt*a
             self.last_sample = time.clock() 
