@@ -1,6 +1,0 @@
-/home/pi/fedora-slambot/build/CMakeFiles/clean_test_results.dir
-/home/pi/fedora-slambot/build/CMakeFiles/doxygen.dir
-/home/pi/fedora-slambot/build/gtest/CMakeFiles/gtest.dir
-/home/pi/fedora-slambot/build/gtest/CMakeFiles/gtest_main.dir
-/home/pi/fedora-slambot/build/CMakeFiles/run_tests.dir
-/home/pi/fedora-slambot/build/CMakeFiles/tests.dir

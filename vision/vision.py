@@ -92,7 +92,7 @@ def WarpImage(img, H, H_inv):
     y_min = int(min(ul_y, ur_y, ll_y, lr_y))
     y_max = int(max(ul_y, ur_y, ll_y, lr_y))
     interp = MakeInterp(img)
-    if (x_max - x_min)*(y_max - y_min) > 100000:
+    if (x_max - x_min)*(y_max - y_min) > 200000:
         print (x_max - x_min)*(y_max - y_min)
         return None, (None,None,None,None)
     coords = ToCoordMatrix(np.r_[x_min:x_max],np.r_[y_min:y_max])

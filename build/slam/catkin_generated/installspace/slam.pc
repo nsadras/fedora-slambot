@@ -1,8 +1,0 @@
-prefix=/home/jonghyunahn/SchoolWork/EE/EE125/project/fedora-slambot/install
-
-Name: slam
-Description: Description of slam
-Version: 0.0.0
-Cflags: 
-Libs: -L/home/jonghyunahn/SchoolWork/EE/EE125/project/fedora-slambot/install/lib 
-Requires: 
