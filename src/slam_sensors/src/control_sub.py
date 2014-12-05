@@ -2,6 +2,7 @@
 
 import rospy, i2c, smbus
 from std_msgs.msg import String
+from robot import *
 
 def init_motor(bus, motor):
     i2c.write(bus, motor, 0x01, 0x13)
@@ -33,16 +34,15 @@ class Chassis:
 
 def callback(message):
     if message.data == 'up':
-        chassis.move(100,100)
+        robot.move(100,100)
     elif message.data == 'down':
-        chassis.move(-100,-100)
-        #chassis.stop()
+        robot.move(-100,-100)
     elif message.data == 'left':
-        chassis.move(-100,100)
+        robot.move(-100,100)
     elif message.data == 'right':
-        chassis.move(100,-100)
+        robot.move(100,-100)
     elif message.data == 'stop':
-        chassis.stop()
+        robot.stop()
 
 def listener():
     rospy.init_node('control_listener')
@@ -50,5 +50,6 @@ def listener():
     rospy.spin()
 
 if __name__ == '__main__':
-    chassis = Chassis(i2c.MOTOR_L, i2c.MOTOR_R)
+    #chassis = Chassis(i2c.MOTOR_L, i2c.MOTOR_R)
+    robot = Robot(MOTOR_L, MOTOR_R, GYRO)
     listener()
