@@ -5,7 +5,6 @@ from slam_sensors.msg import RobotVelocity
 from robot import *
 
 def stream_data():
-    rospy.init_node('gyro')
     pub = rospy.Publisher('gyro_data', RobotVelocity)
 
     r = rospy.Rate(10)
@@ -24,8 +23,15 @@ def stream_data():
             print "i2c read error"
         r.sleep()
 
+def sub_callback(message):
+    if message.data == 'stop':
+        robot.velocity = 0
+
 if __name__ == '__main__':
     robot = Robot(MOTOR_L, MOTOR_R, GYRO)
+
+    rospy.init_node('gyro')
+    rospy.Subscriber('control_data', String, sub_callback)
     try:
         stream_data()
     except rospy.ROSInterruptException:
