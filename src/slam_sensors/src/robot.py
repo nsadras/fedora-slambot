@@ -83,7 +83,7 @@ class Robot:
             accel_high = i2c.read(self.bus, self.gyro, 0x3d)
             accel_low = i2c.read(self.bus, self.gyro, 0x3e)
             accel_raw = (accel_high << 8) | accel_low 
-            a = (to_signed_int(accel_raw) / 16384.) * 9.81
+            a = ((to_signed_int(accel_raw) - 63.7) / 16384.) * 9.81
             dt = time.clock() - self.last_sample
             self.velocity = self.velocity + dt*a
             self.last_sample = time.clock() 
