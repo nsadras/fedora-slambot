@@ -1,7 +1,0 @@
-set(_CATKIN_CURRENT_PACKAGE "slam_sensors")
-set(slam_sensors_MAINTAINER "nitin <nitin@todo.todo>")
-set(slam_sensors_DEPRECATED "")
-set(slam_sensors_VERSION "0.0.0")
-set(slam_sensors_BUILD_DEPENDS "rospy" "sensor_msgs" "std_msgs")
-set(slam_sensors_RUN_DEPENDS "rospy" "sensor_msgs" "std_msgs")
-set(slam_sensors_BUILDTOOL_DEPENDS "catkin")

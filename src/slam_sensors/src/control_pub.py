@@ -7,6 +7,7 @@ interface = pyglet.window.Window(200, 200)
 
 @interface.event
 def on_key_press(symbol, modifiers):
+    print chr(symbol % 256)
     k = chr(symbol % 256)
     if k=='w':
             pub.publish("up")
@@ -20,10 +21,11 @@ def on_key_press(symbol, modifiers):
 
 @interface.event
 def on_key_release(symbol, modifiers):
+    print 'stop'
     pub.publish('stop')
 
 if __name__ == '__main__':
     rospy.init_node('control')
-    pub = rospy.Publisher('control_data', String, queue_size=1)
+    pub = rospy.Publisher('/control_data', String, queue_size=1)
     r = rospy.Rate(10)
     pyglet.app.run()
