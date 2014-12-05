@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "slam")
+set(slam_MAINTAINER "jonghyunahn <jonghyunahn@todo.todo>")
+set(slam_DEPRECATED "")
+set(slam_VERSION "0.0.0")
+set(slam_BUILD_DEPENDS )
+set(slam_RUN_DEPENDS )
+set(slam_BUILDTOOL_DEPENDS "catkin")
