@@ -1,9 +1,9 @@
 #!usr/bin/env python
 import numpy as np 
-import ros
+import rospy
 import time
 
-import Listener
+from Listener import Listener
 
 NUM_LANDMARKS = 16
 
@@ -92,7 +92,7 @@ class Slam:
         self.cov = cov_bar
 
 def main():
-    slamRobot = new Slam(NUM_LANDMARKS)
+    slamRobot = Slam(NUM_LANDMARKS)
     dataListener = Listener('sensorListener','gyro_data',slamRobot.dataQueue) 
     markListener = Listener('camDataListener','markers',slamRobot.markerQueue) 
     while True:
