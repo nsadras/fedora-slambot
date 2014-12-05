@@ -4,9 +4,9 @@ from std_msgs.msg import String
 from slam_sensors.msg import RobotVelocity
 from robot import *
 
-def stream_encoder():
-    rospy.init_node('encoder')
-    pub = rospy.Publisher('encoder_data', RobotVelocity)
+def stream_data():
+    rospy.init_node('gyro')
+    pub = rospy.Publisher('gyro_data', RobotVelocity)
 
     r = rospy.Rate(10)
 
@@ -27,6 +27,6 @@ def stream_encoder():
 if __name__ == '__main__':
     robot = Robot(MOTOR_L, MOTOR_R, GYRO)
     try:
-        stream_encoder()
+        stream_data()
     except rospy.ROSInterruptException:
         pass

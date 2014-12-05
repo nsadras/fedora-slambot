@@ -1,4 +1,4 @@
-import rospy, i2c, smbus
+import rospy, i2c, smbus, time
 
 MOTOR_L = 0x0a
 MOTOR_R = 0x0b
@@ -14,7 +14,26 @@ def init_motor(bus, motor):
     i2c.write(bus, motor, 0x01, 0x13)
 
 def init_gyro(bus, gyro):
-    i2c.write(bus, gyro, 0x6b, 0x00) 
+    """ 
+    gyro scale register values
+    FS_SEL | Full Scale Range   | LSB Sensitivity
+    -------+--------------------+----------------
+    0      | +/- 250 degrees/s  | 131 LSB/deg/s
+    1      | +/- 500 degrees/s  | 65.5 LSB/deg/s
+    2      | +/- 1000 degrees/s | 32.8 LSB/deg/s
+    3      | +/- 2000 degrees/s | 16.4 LSB/deg/s
+    
+    accel scale register values
+    AFS_SEL | Full Scale Range | LSB Sensitivity
+    --------+------------------+----------------
+    0       | +/- 2g           | 8192 LSB/mg
+    1       | +/- 4g           | 4096 LSB/mg
+    2       | +/- 8g           | 2048 LSB/mg
+    3       | +/- 16g          | 1024 LSB/mg  
+    """
+    i2c.write(bus, gyro, 0x6b, 0x00) # activate sensor (asleep by default) 
+    i2c.write(bus, gyro, 0x1b, 0x00) # gyro scale register
+    i2c.write(bus, gyro, 0x1c, 0x00) # accel scale register 
     
 def set_speed(bus, motor, speed):
     if (speed < 0):
@@ -31,6 +50,9 @@ class Robot:
         self.motor_left = motor_left
         self.motor_right = motor_right
         self.gyro = gyro
+        self.velocity = 0
+        self.last_sample = time.clock()
+
         init_motor(self.bus, self.motor_left)
         init_motor(self.bus, self.motor_right)
         init_gyro(self.bus, self.gyro) 
@@ -51,7 +73,7 @@ class Robot:
             gyro_high = i2c.read(self.bus, self.gyro, 0x47)
             gyro_low = i2c.read(self.bus, self.gyro, 0x48)[2:]
             gyro_raw = int(gyro_high + gyro_low, 16)
-            angular = (to_signed_int(gyro_raw) / 114)*.0174 # convert from raw data to radians per second	
+            angular = to_signed_int(gyro_raw) / 131.
             return angular
         except IOError as e:
             return None
@@ -61,12 +83,13 @@ class Robot:
             accel_high = i2c.read(self.bus, self.gyro, 0x3d)
             accel_low = i2c.read(self.bus, self.gyro, 0x3e)[2:]
             accel_raw = int(accel_high + accel_low, 16)
-            linear = (to_signed_int(accel_raw))
-            return linear
+            a = (to_signed_int(accel_raw) / 16384) * 9.81
+            dt = time.clock() - self.last_sample
+            self.velocity = self.velocity + dt*a
+            self.last_sample = time.clock() 
+            return self.velocity
         except IOError as e:
             return None
-
-
 
     def stop(self):
         self.move(0,0)
