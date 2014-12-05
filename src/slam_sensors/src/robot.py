@@ -57,28 +57,39 @@ class Robot:
         init_motor(self.bus, self.motor_right)
         init_gyro(self.bus, self.gyro) 
 
+        self.speed_left = None
+        self.speed_right = None
+
     def move(self, speed_left, speed_right):
-        set_speed(self.bus, self.motor_left, speed_left)
-        set_speed(self.bus, self.motor_right, speed_right)
+        if self.speed_left != speed_left:
+            set_speed(self.bus, self.motor_left, speed_left)
+            self.speed_left = speed_left
+        if self.speed_right != speed_right:
+            set_speed(self.bus, self.motor_right, speed_right)
+            self.speed_right = speed_right
 
     def get_angular_velocity(self):
-        gyro_high = i2c.read(self.bus, self.gyro, 0x47).strip("\n")
-        gyro_low = i2c.read(self.bus, self.gyro, 0x48)[2:]
-        gyro_raw = int(gyro_high + gyro_low, 16)
-        angular = to_signed_int(gyro_raw) / 131.
-        return angular
+        try:
+            gyro_high = i2c.read(self.bus, self.gyro, 0x47)
+            gyro_low = i2c.read(self.bus, self.gyro, 0x48)
+            gyro_raw = (gyro_high << 8) | gyro_low
+            angular = to_signed_int(gyro_raw) / 131.
+            return angular
+        except IOError as e:
+            return None
 
     def get_linear_velocity(self):
-        accel_high = i2c.read(self.bus, self.gyro, 0x3d).strip("\n")
-        accel_low = i2c.read(self.bus, self.gyro, 0x3e)[2:]
-        accel_raw = int(accel_high + accel_low, 16)
-        
-        a = (to_signed_int(accel_raw) / 16384) * 9.81
-        dt = time.clock() - self.last_sample
-        self.velocity = self.velocity + dt*a
-        self.last_sample = time.clock() 
-        return self.velocity
-
+        try:
+            accel_high = i2c.read(self.bus, self.gyro, 0x3d)
+            accel_low = i2c.read(self.bus, self.gyro, 0x3e)
+            accel_raw = (accel_high << 8) | accel_low 
+            a = ((to_signed_int(accel_raw) - 63.7) / 16384.) * 9.81
+            dt = time.clock() - self.last_sample
+            self.velocity = self.velocity + dt*a
+            self.last_sample = time.clock() 
+            return self.velocity
+        except IOError as e:
+            return None
 
     def stop(self):
         self.move(0,0)

@@ -1,18 +1,32 @@
+#!usr/bin/env python
 import numpy as np 
+import rospy
+import time
+import json
+
+from Listener import Listener
+
+NUM_LANDMARKS = 16
 
 class Slam:
     def __init__(self, numLandmarks):
         self.landmarks = [] 
         self.numLandmarks = numLandmarks
+        self.markerQueue = []
+        self.dataQueue = []
         self.position = np.matrix( np.zeros(2 * numLandmarks + 3) ).T
         self.cov = np.matrix( np.zeros( (2 * numLandmarks + 3, 2 * numLandmarks + 3) ) )
+        rospy.init_node('slam')
+        self.pub = rospy.Publisher('/slam_data',String, queue_size =1)
+        self.lastSample = time.clock()
 
     def update(self, robotState, observations = False):
 
     #Prediction Phase
 
         #Updating Mean
-        transV, rotV, timeSlice = robotState[0], robotState[1], robotState[2]   #Subject to change based on format of robotState
+        transV, rotV = robotState[0], robotState[1]
+        timeSlice = time.clock() - self.lastSample
         theta = self.position[2,0]
         F = np.matrix(np.c_[np.eye(3) , np.zeros((3,2 * self.numLandmarks))])
         position_update, position_update_J = 0,0    #Just initialization TODO:MAKE THIS MORE ELEGANT WTF
@@ -76,6 +90,24 @@ class Slam:
                     cov_bar = (np.eye(self.numLandmarks * 2 + 3) - kalman_gain * J_gain) * cov_bar
 
         #Update
+        self.lastSample = time.clock()
         self.position = position_bar
         self.cov = cov_bar
-        print self.cov
+        self.publish()
+
+    def publish(self):
+        #Preprocessing
+        message = json.dumps([self.landmarks,self.position,self.cov])
+        self.pub.publish(message)
+
+def main():
+    slamRobot = Slam(NUM_LANDMARKS)
+    dataListener = Listener('sensorListener','gyro_data',slamRobot.dataQueue) 
+    markListener = Listener('camDataListener','/markers',slamRobot.markerQueue) 
+    while True:
+        if len(slamRobot.dataQueue) >= 1 and len(slamRobot.markerQueue) >= 1:
+            data = dataQueue.pop()
+            markers = markerQueue.pop()
+            slamRobot.update(data,observations=markers)
+
+if __name__ == '__main__': main()
