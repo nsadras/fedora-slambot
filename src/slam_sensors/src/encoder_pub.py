@@ -22,27 +22,26 @@ def stream_encoder():
     r = rospy.Rate(10)
 
     while not rospy.is_shutdown():
-        high = i2c.read(GYRO, 0x47).strip("\n")
-	low = i2c.read(GYRO, 0x48)[2:]
-	raw = int(high + low, 16)
+
         msg = RobotVelocity()
-	angular = (to_signed_int(raw) / 114)*.0174 # convert from raw data to radians per second	
 
-        left_velocity = i2c.readl(MOTOR_L, 0x04)
-        right_velocity = i2c.readl(MOTOR_R, 0x04)
+        gyro_high = i2c.read(GYRO, 0x47).strip("\n")
+	gyro_low = i2c.read(GYRO, 0x48)[2:]
+	gyro_raw = int(gyro_high + gyro_low, 16)
+	angular = (to_signed_int(gyro_raw) / 114)*.0174 # convert from raw data to radians per second	
 
-        print "left: %s right: %s" % (left_velocity, right_velocity)
+        accel_high = i2c.read(GYRO, 0x3d).strip("\n")
+        accel_low = i2c.read(GYRO, 0x3e)[2:]
+        accel_raw = int(accel_high + accel_low, 16)
+        linear = (to_signed_int(accel_raw))
 
         msg.angular_velocity = angular
-        msg.linear_velocity = right_velocity
+        msg.linear_velocity = linear
         pub.publish(str(msg))
         r.sleep()
 
 if __name__ == '__main__':
-    #i2c.write(GYRO, 0x20, 0x1f)
-    #i2c.write(GYRO, 0x22, 0x08)
-    #i2c.write(GYRO, 0x24, 0x80)
-    i2c.write(bus, GYRO, 0x6b, 0x00)
+    i2c.write(bus, GYRO, 0x6b, 0x00) # activate sensor
     try:
         stream_encoder()
     except rospy.ROSInterruptException:
