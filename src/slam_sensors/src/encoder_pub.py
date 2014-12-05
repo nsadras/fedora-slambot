@@ -14,9 +14,14 @@ def stream_encoder():
 
         msg = RobotVelocity()
 
-        msg.angular_velocity = robot.get_angular_velocity()
-        msg.linear_velocity = robot.get_linear_velocity()
-        pub.publish(msg)
+        angular = robot.get_angular_velocity()
+        linear = robot.get_linear_velocity()
+        if angular is not None and linear is not None:
+            msg.angular_velocity = angular
+            msg.linear_velocity = linear
+            pub.publish(msg)
+        else:
+            print "i2c read error"
         r.sleep()
 
 if __name__ == '__main__':
