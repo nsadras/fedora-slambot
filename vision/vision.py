@@ -223,6 +223,7 @@ def GetBounds(a,b,c,d):
     return min(ax,bx,cx,dx),max(ax,bx,cx,dx),min(ay,by,cy,dy),max(ay,by,cy,dy)
 
 def GetRGBBounds(img, vision):
+    height, width, _ = np.shape(img)
     kernel = np.ones((5,5),np.uint8)
     black_pix = HSVRange(img,
             vision.params['BLACK']['hsvs'],
@@ -231,19 +232,19 @@ def GetRGBBounds(img, vision):
     red_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['RED']['hsvs'],
             vision.params['RED']['thresh'],
-            blur_radius = 1))
+            blur_radius = 1))[:height/2,:width/2]
     green_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['GREEN']['hsvs'],
             vision.params['GREEN']['thresh'],
-            blur_radius = 1))
+            blur_radius = 1))[:height/2,width/2:]
     blue_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['BLUE']['hsvs'],
             vision.params['BLUE']['thresh'],
-            blur_radius = 1))
+            blur_radius = 1))[height/2:,width/2:]
     yellow_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['YELLOW']['hsvs'],
             vision.params['YELLOW']['thresh'],
-            blur_radius = 1))
+            blur_radius = 1))[height/2:,:width/2]
     #red_pix = cv2.morphologyEx(red_pix, cv2.MORPH_OPEN, kernel)
     green_pix = cv2.morphologyEx(green_pix, cv2.MORPH_OPEN, kernel)
     #blue_pix = cv2.morphologyEx(blue_pix, cv2.MORPH_OPEN, kernel)
@@ -258,9 +259,9 @@ def GetRGBBounds(img, vision):
         return None
 
     p1 = (np.max(r_x), np.max(r_y))
-    p2 = (np.min(g_x), np.max(g_y))
-    p3 = (np.min(b_x), np.min(b_y))
-    p4 = (np.max(y_x), np.min(y_y))
+    p2 = (np.min(g_x + width/2), np.max(g_y))
+    p3 = (np.min(b_x + width/2), np.min(b_y + height/2))
+    p4 = (np.max(y_x), np.min(y_y + height/2))
     return p1,p2,p3,p4
 
 def PercentBlack(img, threshold):
@@ -451,7 +452,7 @@ class Vision:
             position = PositionMarker(marker,frame,self)
             if not position:
                 continue
-            output.append((identity, position))
+            output.append((identity, (position[0]/100.0,position[1]/100.0)))
 
         if red_centers:
             for center in red_centers:

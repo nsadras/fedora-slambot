@@ -2,6 +2,7 @@
 import numpy as np 
 import rospy
 import time
+import json
 
 from Listener import Listener
 
@@ -15,6 +16,8 @@ class Slam:
         self.dataQueue = []
         self.position = np.matrix( np.zeros(2 * numLandmarks + 3) ).T
         self.cov = np.matrix( np.zeros( (2 * numLandmarks + 3, 2 * numLandmarks + 3) ) )
+        rospy.init_node('slam')
+        self.pub = rospy.Publisher('/slam_data',String, queue_size =1)
         self.lastSample = time.clock()
 
     def update(self, robotState, observations = False):
@@ -90,11 +93,17 @@ class Slam:
         self.lastSample = time.clock()
         self.position = position_bar
         self.cov = cov_bar
+        self.publish()
+
+    def publish(self):
+        #Preprocessing
+        message = json.dumps([self.landmarks,self.position,self.cov])
+        self.pub.publish(message)
 
 def main():
     slamRobot = Slam(NUM_LANDMARKS)
     dataListener = Listener('sensorListener','gyro_data',slamRobot.dataQueue) 
-    markListener = Listener('camDataListener','markers',slamRobot.markerQueue) 
+    markListener = Listener('camDataListener','/markers',slamRobot.markerQueue) 
     while True:
         if len(slamRobot.dataQueue) >= 1 and len(slamRobot.markerQueue) >= 1:
             data = dataQueue.pop()
