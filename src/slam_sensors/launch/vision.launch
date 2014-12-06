@@ -1,6 +1,4 @@
 <launch>
     <node name="raspicam_node" pkg="raspicam" type="raspicam_node" args="_framerate:=4 _quality:=10"/> 
     <node launch-prefix="$(find slam_sensors)/kickstart/start_camera.sh" name="throttle" pkg="topic_tools" type="throttle" args="messages /camera/image/compressed 4.0 /throttled_camera_image"/> 
-    <node name="encoder" pkg="slam_sensors" type="encoder_pub.py"/> 
-    <node name="control_listener" pkg="slam_sensors" type="control_sub.py"/>
 </launch>
