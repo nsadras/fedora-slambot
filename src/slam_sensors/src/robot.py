@@ -1,4 +1,5 @@
 import rospy, i2c, smbus, time
+from math import pi
 
 MOTOR_L = 0x0a
 MOTOR_R = 0x0b
@@ -53,12 +54,35 @@ class Robot:
         self.velocity = 0
         self.last_sample = time.clock()
 
+        self.is_stopped = True
+
         init_motor(self.bus, self.motor_left)
         init_motor(self.bus, self.motor_right)
         init_gyro(self.bus, self.gyro) 
 
         self.speed_left = None
         self.speed_right = None
+        self.accel_bias = 0.0
+        self.gyro_bias = 0.0
+
+    def calibrate_sensors(self, num_samples = 1000):
+        print "Please put the robot flat on the ground while it calibrates its sensors."
+        accel_total = 0.0
+        gyro_total = 0.0
+        for _ in range(num_samples):
+            accel_high = i2c.read(self.bus, self.gyro, 0x3d)
+            accel_low = i2c.read(self.bus, self.gyro, 0x3e)
+            accel_raw = (accel_high << 8) | accel_low 
+            accel_total += to_signed_int(accel_raw)
+            gyro_high = i2c.read(self.bus, self.gyro, 0x47)
+            gyro_low = i2c.read(self.bus, self.gyro, 0x48)
+            gyro_raw = (gyro_high << 8) | gyro_low
+            gyro_total += to_signed_int(gyro_raw)
+        self.accel_bias = accel_total / float(num_samples)
+        self.gyro_bias = gyro_total / float(num_samples)
+        print "Done calibrating."
+        print self.accel_bias, self.gyro_bias
+
 
     def move(self, speed_left, speed_right):
         if self.speed_left != speed_left:
@@ -73,17 +97,21 @@ class Robot:
             gyro_high = i2c.read(self.bus, self.gyro, 0x47)
             gyro_low = i2c.read(self.bus, self.gyro, 0x48)
             gyro_raw = (gyro_high << 8) | gyro_low
-            angular = to_signed_int(gyro_raw) / 131.
+            angular = (to_signed_int(gyro_raw) - self.gyro_bias) / 131.
+            angular = angular * pi/180.
             return angular
         except IOError as e:
             return None
 
     def get_linear_velocity(self):
+        if self.is_stopped:
+            self.velocity = 0.0
+            return self.velocity
         try:
             accel_high = i2c.read(self.bus, self.gyro, 0x3d)
             accel_low = i2c.read(self.bus, self.gyro, 0x3e)
             accel_raw = (accel_high << 8) | accel_low 
-            a = ((to_signed_int(accel_raw) - 63.7) / 16384.) * 9.81
+            a = ((to_signed_int(accel_raw) - self.accel_bias) / 16384.) * 9.81
             dt = time.clock() - self.last_sample
             self.velocity = self.velocity + dt*a
             self.last_sample = time.clock() 
