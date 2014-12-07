@@ -222,7 +222,7 @@ def GetBounds(a,b,c,d):
     dx,dy = d
     return min(ax,bx,cx,dx),max(ax,bx,cx,dx),min(ay,by,cy,dy),max(ay,by,cy,dy)
 
-def GetRGBBounds(img, vision):
+def GetRGBBounds(img, vision, debug):
     height, width, _ = np.shape(img)
     kernel = np.ones((5,5),np.uint8)
     black_pix = HSVRange(img,
@@ -232,23 +232,43 @@ def GetRGBBounds(img, vision):
     red_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['RED']['hsvs'],
             vision.params['RED']['thresh'],
-            blur_radius = 1))[:height/2,:width/2]
+            blur_radius = 1))
     green_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['GREEN']['hsvs'],
             vision.params['GREEN']['thresh'],
-            blur_radius = 1))[:height/2,width/2:]
+            blur_radius = 1))
     blue_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['BLUE']['hsvs'],
             vision.params['BLUE']['thresh'],
-            blur_radius = 1))[height/2:,width/2:]
+            blur_radius = 1))
     yellow_pix = cv2.bitwise_and(cv2.bitwise_not(black_pix),HSVRange(img,
             vision.params['YELLOW']['hsvs'],
             vision.params['YELLOW']['thresh'],
-            blur_radius = 1))[height/2:,:width/2]
+            blur_radius = 1))
+    all_pix = red_pix + green_pix + blue_pix + yellow_pix
+    all_y, all_x = np.nonzero(all_pix)
+    if len(all_x) == 0 or len(all_y) == 0:
+        return None
+
+    center_x = (np.min(all_x) + np.max(all_x))/2
+    center_y = (np.min(all_y) + np.max(all_y))/2
+
+    red_pix = red_pix[:center_y,:center_x]
+    green_pix = green_pix[:center_y,center_x:]
+    blue_pix = blue_pix[center_y:,center_x:]
+    yellow_pix = yellow_pix[center_y:,:center_x]
+
     #red_pix = cv2.morphologyEx(red_pix, cv2.MORPH_OPEN, kernel)
     green_pix = cv2.morphologyEx(green_pix, cv2.MORPH_OPEN, kernel)
     #blue_pix = cv2.morphologyEx(blue_pix, cv2.MORPH_OPEN, kernel)
     #yellow_pix = cv2.morphologyEx(yellow_pix, cv2.MORPH_OPEN, kernel)
+
+    #cv2.imshow('r',red_pix)
+    #cv2.imshow('g',green_pix)
+    #cv2.imshow('b',blue_pix)
+    #cv2.imshow('y',yellow_pix)
+    #cv2.imshow('k',black_pix)
+    #cv2.imshow('i',img)
 
     r_y,r_x = np.nonzero(red_pix)
     g_y,g_x = np.nonzero(green_pix)
@@ -259,14 +279,16 @@ def GetRGBBounds(img, vision):
         return None
 
     p1 = (np.max(r_x), np.max(r_y))
-    p2 = (np.min(g_x + width/2), np.max(g_y))
-    p3 = (np.min(b_x + width/2), np.min(b_y + height/2))
-    p4 = (np.max(y_x), np.min(y_y + height/2))
+    p2 = (np.min(g_x + center_x), np.max(g_y))
+    p3 = (np.min(b_x + center_x), np.min(b_y + center_y))
+    p4 = (np.max(y_x), np.min(y_y + center_y))
     return p1,p2,p3,p4
 
 def PercentBlack(img, threshold):
     h,w,_ = np.shape(img)
     if h*w == 0:
+        return None
+    if h < 25 or w < 25:
         return None
     black_pix = np.average(img/255.0, axis=2) < threshold
     height, width = np.shape(black_pix)
@@ -296,7 +318,7 @@ def IdentifyMarker(marker,img, vision, black_threshold = 0.5, cell_threshold = 0
         return None
     warped = (255*warp_float).astype(np.uint8)
 
-    bounds = GetRGBBounds(warped, vision)
+    bounds = GetRGBBounds(warped, vision, False)
     if not bounds:
         print "Could not get RGB Bounds."
         return None
@@ -313,7 +335,7 @@ def IdentifyMarker(marker,img, vision, black_threshold = 0.5, cell_threshold = 0
         return None
     rectified = (255*rectified).astype(np.uint8)
 
-    bounds = GetRGBBounds(rectified, vision)
+    bounds = GetRGBBounds(rectified, vision, True)
     if not bounds:
         print "Could not get RGBBounds 2."
         return None
@@ -325,6 +347,11 @@ def IdentifyMarker(marker,img, vision, black_threshold = 0.5, cell_threshold = 0
     cell3 = rectified[RECTIFICATION_DIMENSION/2:, RECTIFICATION_DIMENSION/2:]
     cell4 = rectified[RECTIFICATION_DIMENSION/2:, :RECTIFICATION_DIMENSION/2]
 
+    #cv2.imshow('1',cell1)
+    #cv2.imshow('2',cell2)
+    #cv2.imshow('3',cell3)
+    #cv2.imshow('4',cell4)
+    cv2.imshow('rect',rectified)
 
     v1 = PercentBlack(cell1, black_threshold)
     v2 = PercentBlack(cell2, black_threshold)
